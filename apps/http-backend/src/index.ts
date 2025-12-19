@@ -76,7 +76,6 @@ app.post("/room", authMiddleware, async (req, res) => {
   if (!parsedData.success) {
     return res.status(400).send({ message: "Invalid request data" });
   }
-  console.log("Creating room for user:", req.userId);
   const userId = req.userId;
   try {
     const room = await prismaClient.room.create({
@@ -94,6 +93,20 @@ app.post("/room", authMiddleware, async (req, res) => {
       message: e instanceof Error ? e.message : "Internal server error",
     });
   }
+});
+
+app.get( "/chats/:roomId",async (req, res) => {
+  const roomId = Number(req.params.roomId);
+  const messages = await prismaClient.chat.findMany({
+    where:{
+      roomId: roomId
+    },
+    orderBy:{ id: 'desc' },
+    take : 50
+  })
+  res.json({ message: "Chats fetched successfully",
+    messages:  messages
+  })
 });
 
 app.listen(3001, () => {
