@@ -8,6 +8,7 @@
     "start": "next start"
   },
   "dependencies": {
+    "@excalidraw/excalidraw": "^0.18.0",
     "@repo/ui": "workspace:*",
     "@types/axios": "^0.14.4",
     "axios": "^1.13.2",

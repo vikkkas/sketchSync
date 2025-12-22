@@ -1,135 +1,259 @@
-# Turborepo starter
+# Excalidraw Clone - Collaborative Sketch App
 
-This Turborepo starter is maintained by the Turborepo core team.
+A production-ready collaborative whiteboarding application built with Next.js, WebSockets, and PostgreSQL. Features real-time collaboration, authentication, and an Excalidraw-like drawing experience.
 
-## Using this example
+## 🚀 Quick Start
 
-Run the following command:
+### Prerequisites
 
-```sh
-npx create-turbo@latest
+- Node.js 18+ 
+- PostgreSQL database
+- pnpm (recommended) or npm
+
+### 1. Install Dependencies
+
+```bash
+pnpm install
 ```
 
-## What's inside?
+### 2. Setup Environment Variables
 
-This Turborepo includes the following packages/apps:
+Copy the example environment file:
 
-### Apps and Packages
-
-- `docs`: a [Next.js](https://nextjs.org/) app
-- `web`: another [Next.js](https://nextjs.org/) app
-- `@repo/ui`: a stub React component library shared by both `web` and `docs` applications
-- `@repo/eslint-config`: `eslint` configurations (includes `eslint-config-next` and `eslint-config-prettier`)
-- `@repo/typescript-config`: `tsconfig.json`s used throughout the monorepo
-
-Each package/app is 100% [TypeScript](https://www.typescriptlang.org/).
-
-### Utilities
-
-This Turborepo has some additional tools already setup for you:
-
-- [TypeScript](https://www.typescriptlang.org/) for static type checking
-- [ESLint](https://eslint.org/) for code linting
-- [Prettier](https://prettier.io) for code formatting
-
-### Build
-
-To build all apps and packages, run the following command:
-
-```
-cd my-turborepo
-
-# With [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation) installed (recommended)
-turbo build
-
-# Without [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation), use your package manager
-npx turbo build
-yarn dlx turbo build
-pnpm exec turbo build
+```bash
+cp .env.example .env
 ```
 
-You can build a specific package by using a [filter](https://turborepo.com/docs/crafting-your-repository/running-tasks#using-filters):
+Update the `.env` file with your database credentials:
 
-```
-# With [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation) installed (recommended)
-turbo build --filter=docs
-
-# Without [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation), use your package manager
-npx turbo build --filter=docs
-yarn exec turbo build --filter=docs
-pnpm exec turbo build --filter=docs
+```env
+DATABASE_URL="postgresql://postgres:postgres@localhost:5432/excal_db?schema=public"
+JWT_SECRET="your-super-secret-jwt-key-change-this-in-production"
 ```
 
-### Develop
+### 3. Setup Database
 
-To develop all apps and packages, run the following command:
+Make sure PostgreSQL is running, then push the schema:
 
-```
-cd my-turborepo
-
-# With [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation) installed (recommended)
-turbo dev
-
-# Without [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation), use your package manager
-npx turbo dev
-yarn exec turbo dev
-pnpm exec turbo dev
+```bash
+pnpm --filter @repo/db db:push
 ```
 
-You can develop a specific package by using a [filter](https://turborepo.com/docs/crafting-your-repository/running-tasks#using-filters):
+Or if you prefer migrations:
 
-```
-# With [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation) installed (recommended)
-turbo dev --filter=web
-
-# Without [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation), use your package manager
-npx turbo dev --filter=web
-yarn exec turbo dev --filter=web
-pnpm exec turbo dev --filter=web
+```bash
+pnpm --filter @repo/db db:migrate
 ```
 
-### Remote Caching
+### 4. Start Development Servers
 
-> [!TIP]
-> Vercel Remote Cache is free for all plans. Get started today at [vercel.com](https://vercel.com/signup?/signup?utm_source=remote-cache-sdk&utm_campaign=free_remote_cache).
+Open 3 terminal windows and run:
 
-Turborepo can use a technique known as [Remote Caching](https://turborepo.com/docs/core-concepts/remote-caching) to share cache artifacts across machines, enabling you to share build caches with your team and CI/CD pipelines.
-
-By default, Turborepo will cache locally. To enable Remote Caching you will need an account with Vercel. If you don't have an account you can [create one](https://vercel.com/signup?utm_source=turborepo-examples), then enter the following commands:
-
-```
-cd my-turborepo
-
-# With [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation) installed (recommended)
-turbo login
-
-# Without [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation), use your package manager
-npx turbo login
-yarn exec turbo login
-pnpm exec turbo login
+**Terminal 1 - HTTP Backend:**
+```bash
+pnpm --filter http-backend dev
 ```
 
-This will authenticate the Turborepo CLI with your [Vercel account](https://vercel.com/docs/concepts/personal-accounts/overview).
-
-Next, you can link your Turborepo to your Remote Cache by running the following command from the root of your Turborepo:
-
-```
-# With [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation) installed (recommended)
-turbo link
-
-# Without [global `turbo`](https://turborepo.com/docs/getting-started/installation#global-installation), use your package manager
-npx turbo link
-yarn exec turbo link
-pnpm exec turbo link
+**Terminal 2 - WebSocket Backend:**
+```bash
+pnpm --filter ws-backend dev
 ```
 
-## Useful Links
+**Terminal 3 - Frontend:**
+```bash
+pnpm --filter sketchapp-frontend dev
+```
 
-Learn more about the power of Turborepo:
+### 5. Access the Application
 
-- [Tasks](https://turborepo.com/docs/crafting-your-repository/running-tasks)
-- [Caching](https://turborepo.com/docs/crafting-your-repository/caching)
-- [Remote Caching](https://turborepo.com/docs/core-concepts/remote-caching)
-- [Filtering](https://turborepo.com/docs/crafting-your-repository/running-tasks#using-filters)
-- [Configuration Options](https://turborepo.com/docs/reference/configuration)
-- [CLI Usage](https://turborepo.com/docs/reference/command-line-reference)
+- Frontend: http://localhost:3000
+- HTTP API: http://localhost:3001
+- WebSocket: ws://localhost:8080
+
+## 📦 What's Included
+
+### ✅ Completed Features
+
+- **Authentication System**
+  - Secure password hashing with bcrypt
+  - JWT-based authentication (access + refresh tokens)
+  - Session management
+  - Protected routes
+
+- **Real-time Collaboration**
+  - WebSocket-based communication
+  - User presence tracking
+  - Cursor position sharing
+  - Canvas state synchronization
+  - Real-time chat
+
+- **Backend Infrastructure**
+  - Express HTTP server with REST API
+  - WebSocket server for real-time features
+  - PostgreSQL database with Prisma ORM
+  - Comprehensive error handling
+
+- **Frontend Infrastructure**
+  - Next.js 14 with App Router
+  - TypeScript throughout
+  - Custom WebSocket hook with auto-reconnection
+  - API client with automatic token refresh
+  - Tailwind CSS for styling
+
+### 🚧 In Progress
+
+- Excalidraw-like UI components
+- Canvas drawing engine
+- Collaborative drawing tools
+- Room management UI
+
+## 🏗️ Architecture
+
+```
+┌─────────────────┐
+│   Frontend      │
+│   (Next.js)     │
+│   Port: 3000    │
+└────────┬────────┘
+         │
+         ├──────────────┐
+         │              │
+         ▼              ▼
+┌─────────────┐  ┌──────────────┐
+│ HTTP API    │  │  WebSocket   │
+│ (Express)   │  │  Server      │
+│ Port: 3001  │  │  Port: 8080  │
+└──────┬──────┘  └──────┬───────┘
+       │                │
+       └────────┬───────┘
+                ▼
+        ┌───────────────┐
+        │  PostgreSQL   │
+        │   Database    │
+        └───────────────┘
+```
+
+## 📁 Project Structure
+
+```
+excal/
+├── apps/
+│   ├── sketchapp-frontend/     # Next.js frontend application
+│   │   ├── app/                # Next.js app router pages
+│   │   ├── components/         # React components
+│   │   ├── hooks/              # Custom React hooks
+│   │   ├── lib/                # Utilities and API client
+│   │   └── types/              # TypeScript type definitions
+│   │
+│   ├── http-backend/           # Express HTTP API server
+│   │   └── src/
+│   │       ├── services/       # Business logic services
+│   │       ├── middleware.ts   # Express middleware
+│   │       └── index.ts        # Main server file
+│   │
+│   └── ws-backend/             # WebSocket server
+│       └── src/
+│           └── index.ts        # WebSocket logic
+│
+├── packages/
+│   ├── db/                     # Database package
+│   │   └── prisma/
+│   │       └── schema.prisma   # Database schema
+│   ├── common/                 # Shared types and utilities
+│   ├── backend-common/         # Backend shared code
+│   └── ui/                     # Shared UI components
+│
+├── .env.example                # Environment variables template
+├── PROGRESS.md                 # Detailed progress documentation
+└── README.md                   # This file
+```
+
+## 🔌 API Endpoints
+
+### Authentication
+- `POST /api/auth/signup` - Register new user
+- `POST /api/auth/signin` - Login
+- `POST /api/auth/logout` - Logout
+- `POST /api/auth/refresh` - Refresh access token
+- `GET /api/user/me` - Get current user
+
+### Rooms
+- `POST /api/room` - Create new room
+- `GET /api/room/:slug` - Get room by slug
+- `GET /api/rooms` - List user's rooms
+
+### Canvas
+- `GET /api/canvas/:roomId` - Get canvas data
+- `POST /api/canvas/:roomId/save` - Save canvas state
+
+### Chat
+- `GET /api/chats/:roomId` - Get chat messages
+
+## 🔐 Security Features
+
+- ✅ Password hashing with bcrypt (10 rounds)
+- ✅ JWT authentication with access & refresh tokens
+- ✅ Session management with expiration
+- ✅ CORS configuration
+- ✅ Input validation with Zod schemas
+- ✅ Protected API routes
+- ✅ Automatic token refresh
+
+## 🛠️ Development
+
+### Database Commands
+
+```bash
+# Generate Prisma client
+pnpm --filter @repo/db db:generate
+
+# Push schema to database (development)
+pnpm --filter @repo/db db:push
+
+# Create migration (production)
+pnpm --filter @repo/db db:migrate
+
+# Open Prisma Studio (database GUI)
+pnpm --filter @repo/db db:studio
+```
+
+### Build for Production
+
+```bash
+# Build all packages
+pnpm build
+
+# Build specific package
+pnpm --filter sketchapp-frontend build
+```
+
+## 📚 Tech Stack
+
+- **Frontend**: Next.js 14, React 19, TypeScript, Tailwind CSS
+- **Backend**: Node.js, Express, WebSocket (ws)
+- **Database**: PostgreSQL, Prisma ORM
+- **Authentication**: JWT, bcrypt
+- **Monorepo**: Turborepo, pnpm workspaces
+
+## 🎯 Next Steps
+
+See [PROGRESS.md](./PROGRESS.md) for detailed implementation status and next steps.
+
+Key upcoming features:
+1. Excalidraw-like drawing UI
+2. Canvas drawing engine with tools
+3. Collaborative drawing features
+4. Room management UI
+5. Production optimizations
+
+## 📝 License
+
+MIT
+
+## 🤝 Contributing
+
+This is a prototype project. Feel free to fork and modify as needed.
+
+## 📞 Support
+
+For issues or questions, please check the [PROGRESS.md](./PROGRESS.md) file for implementation details.

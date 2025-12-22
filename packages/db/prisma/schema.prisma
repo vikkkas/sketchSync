@@ -13,29 +13,95 @@ datasource db {
 }
 
 model User {
-  id       String @id @default(uuid())
-  email    String @unique
-  password String
-  name     String
-  photo    String?
-  chats     Chat[]
-  rooms    Room[]
+  id            String        @id @default(uuid())
+  email         String        @unique
+  password      String
+  name          String
+  photo         String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @default(now()) @updatedAt
+  chats         Chat[]
+  rooms         Room[]
+  canvases      Canvas[]
+  roomMembers   RoomMember[]
+  sessions      Session[]
 }
 
 model Room {
+  id          Int           @id @default(autoincrement())
+  slug        String        @unique
+  name        String?
+  isPublic    Boolean       @default(false)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @default(now()) @updatedAt
+  adminId     String
+  admin       User          @relation(fields: [adminId], references: [id])
+  chats       Chat[]
+  canvas      Canvas?
+  members     RoomMember[]
+}
+
+model RoomMember {
   id        Int      @id @default(autoincrement())
-  slug      String   @unique
-  createdAt DateTime @default(now())
-  adminId   String
-  admin     User     @relation(fields: [adminId], references: [id])
-  chats     Chat[]
+  roomId    Int
+  userId    String
+  role      String   @default("viewer") // admin, editor, viewer
+  joinedAt  DateTime @default(now())
+  room      Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@unique([roomId, userId])
+}
+
+model Canvas {
+  id          Int              @id @default(autoincrement())
+  roomId      Int              @unique
+  createdBy   String
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  version     Int              @default(1)
+  data        Json?            // Store complete canvas state
+  room        Room             @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  creator     User             @relation(fields: [createdBy], references: [id])
+  elements    CanvasElement[]
+}
+
+model CanvasElement {
+  id          String    @id @default(uuid())
+  canvasId    Int
+  type        String    // rectangle, ellipse, arrow, line, text, freedraw
+  x           Float
+  y           Float
+  width       Float
+  height      Float
+  angle       Float     @default(0)
+  strokeColor String    @default("#000000")
+  backgroundColor String @default("transparent")
+  fillStyle   String    @default("solid")
+  strokeWidth Int       @default(1)
+  roughness   Int       @default(1)
+  opacity     Int       @default(100)
+  data        Json?     // Additional element-specific data (points for lines, text content, etc.)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  canvas      Canvas    @relation(fields: [canvasId], references: [id], onDelete: Cascade)
 }
 
 model Chat {
-  id      Int    @id @default(autoincrement())
-  roomId  Int
-  message String
-  userId  String
-  room    Room   @relation(fields: [roomId], references: [id])
-  user   User   @relation(fields: [userId], references: [id])
+  id        Int      @id @default(autoincrement())
+  roomId    Int
+  message   String
+  userId    String
+  createdAt DateTime @default(now())
+  room      Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Session {
+  id        String   @id @default(uuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
