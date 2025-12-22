@@ -8,10 +8,16 @@ import {
 } from "@repo/common/types";
 import { prismaClient } from "@repo/db/client";
 import { authMiddleware } from "./middleware";
+import cors from "cors";
 
 const app = express();
 app.use(express.json());
 
+app.use(cors({
+  origin: "http://localhost:3000", // Adjust this to your frontend URL
+  methods: ["GET", "POST", "PUT", "DELETE"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+}));
 app.post("/signup", async (req, res) => {
   // Handle user signup logic here
   const parsedData = CreateUserSchema.safeParse(req.body);

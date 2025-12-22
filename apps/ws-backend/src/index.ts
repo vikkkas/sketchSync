@@ -51,6 +51,12 @@ wss.on("connection", function connection(ws, request) {
 
   ws.on("message", async function message(data) {
     let parsedData;
+    if(typeof data !== 'string') {
+      parsedData = data.toString();
+    } else {
+      parsedData = JSON.parse(data);
+    }
+    console.log("received: %s", data);
     try {
       parsedData = JSON.parse(data.toString());
     } catch (error) {
@@ -74,6 +80,9 @@ wss.on("connection", function connection(ws, request) {
     if (parsedData.type === "chat") {
       const room = parsedData.roomId;
       const message = parsedData.message;
+      console.log("Chat message received for room:", room);
+      console.log("Current users and their rooms:", users.map(u => ({ userId: u.userId, rooms: u.rooms })));
+      
       await prismaClient.chat.create({
         data: {
           roomId: Number(room),
@@ -81,8 +90,12 @@ wss.on("connection", function connection(ws, request) {
           message: message, 
         },
       });
+      
+      let sentCount = 0;
       users.forEach((user) => {
+        console.log(`Checking user ${user.userId}, rooms:`, user.rooms, "includes room?", user.rooms.includes(room));
         if (user.rooms.includes(room)) {
+          sentCount++;
           user.ws.send(
             JSON.stringify({
               type: "chat",
@@ -92,6 +105,7 @@ wss.on("connection", function connection(ws, request) {
           );
         }
       });
+      console.log(`Sent message to ${sentCount} users`);
     }
   });
 });
