@@ -10,28 +10,13 @@ import { authMiddleware, optionalAuthMiddleware } from "./middleware";
 import cors from "cors";
 import { AuthService } from "./services/auth.service";
 import { FRONTEND_URL, PORT } from "./config";
-console.log(FRONTEND_URL);
 const app = express();
 app.use(express.json());
 
 // CORS Configuration
 app.use(
   cors({
-    origin: (origin, callback) => {
-      console.log("Request origin:", origin);
-      console.log("Allowed origin:", FRONTEND_URL);
-      
-      // Allow requests with no origin (like mobile apps, Postman, etc.)
-      if (!origin) return callback(null, true);
-      
-      // Check if origin matches
-      if (origin === FRONTEND_URL) {
-        callback(null, true);
-      } else {
-        console.warn(`CORS blocked origin: ${origin}`);
-        callback(new Error("Not allowed by CORS"));
-      }
-    },
+    origin: FRONTEND_URL,
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
     credentials: true,
