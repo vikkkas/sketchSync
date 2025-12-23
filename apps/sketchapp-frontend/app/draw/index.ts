@@ -1,7 +1,6 @@
-import { HTTP_BACKEND } from "@/config";
 import axios from "axios";
 import { clear } from "console";
-
+const HTTP_BACKEND = process.env.HTTP_BACKEND_URL;
 type Shape =
   | {
       type: "rect";
