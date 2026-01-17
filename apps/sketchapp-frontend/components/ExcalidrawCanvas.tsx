@@ -7,22 +7,28 @@ import { roomAPI, canvasAPI } from "@/lib/api";
 import { Share2, Users, Save } from "lucide-react";
 import { ShareModal } from "./ShareModal";
 import { toast } from "sonner";
+import { useTheme } from "@/contexts/ThemeContext";
 
 interface ExcalidrawCanvasProps {
   roomSlug: string;
 }
 
 export function ExcalidrawCanvas({ roomSlug }: ExcalidrawCanvasProps) {
+  const { theme } = useTheme();
   const [room, setRoom] = useState<any>(null);
   const [initialData, setInitialData] = useState<any>(null);
   const excalidrawRef = useRef<any>(null); // Use ref for immediate access
   const [excalidrawAPI, setExcalidrawAPI] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [autoSaving, setAutoSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [showShareModal, setShowShareModal] = useState(false);
   const isRemoteUpdate = useRef<boolean>(false);
   const pendingUpdates = useRef<Array<{ elements: any[], appState: any }>>([]);
+  const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const lastBroadcastRef = useRef<number>(0);
+  const [collaborators, setCollaborators] = useState<Map<string, any>>(new Map());
 
   // Get token and user from localStorage
   const token = typeof window !== "undefined" 
@@ -44,9 +50,23 @@ export function ExcalidrawCanvas({ roomSlug }: ExcalidrawCanvasProps) {
     isConnected,
     activeUsers,
     sendCanvasUpdate,
+    sendCursorPosition,
   } = useWebSocket({
     roomId: room?.id?.toString() || "",
     token,
+    onCursorUpdate: useCallback((userId: string, x: number, y: number, color: string) => {
+      // Update collaborator cursor position
+      setCollaborators(prev => {
+        const updated = new Map(prev);
+        updated.set(userId, {
+          pointer: { x, y },
+          button: "up",
+          username: userId, // Will be updated with actual name later
+          userState: { color },
+        });
+        return updated;
+      });
+    }, []),
     onCanvasUpdate: useCallback((elements: any[], appState: any) => {
       console.log('📥 Received canvas update:', elements.length, 'elements');
       
@@ -76,16 +96,11 @@ export function ExcalidrawCanvas({ roomSlug }: ExcalidrawCanvasProps) {
           });
         }
 
-        // Update scene
-        // REMOVED collaborators to fix crash
+        // Only update elements, preserve local app state
+        // This keeps tool selection, theme, zoom, scroll independent per user
         api.updateScene({
           elements,
-          appState: {
-            ...safeAppState,
-            scrollX: api.getAppState().scrollX,
-            scrollY: api.getAppState().scrollY,
-            zoom: api.getAppState().zoom,
-          },
+          // Don't update appState - keeps each user's preferences independent
           commitToHistory: false,
         });
         
@@ -102,6 +117,25 @@ export function ExcalidrawCanvas({ roomSlug }: ExcalidrawCanvasProps) {
       }
     }, []), // No dependencies needed since we use ref
   });
+
+  // Update collaborator usernames when activeUsers changes
+  useEffect(() => {
+    if (activeUsers.length > 0) {
+      setCollaborators(prev => {
+        const updated = new Map(prev);
+        activeUsers.forEach(user => {
+          const existing = updated.get(user.id);
+          if (existing) {
+            updated.set(user.id, {
+              ...existing,
+              username: user.name,
+            });
+          }
+        });
+        return updated;
+      });
+    }
+  }, [activeUsers]);
 
   // Apply pending updates when API becomes available
   useEffect(() => {
@@ -166,6 +200,47 @@ export function ExcalidrawCanvas({ roomSlug }: ExcalidrawCanvasProps) {
     }
   }, [roomSlug]);
 
+  // Sync Excalidraw theme with app theme
+  useEffect(() => {
+    if (excalidrawAPI) {
+      excalidrawAPI.updateScene({
+        appState: {
+          theme: theme,
+        },
+      });
+      console.log(`🎨 Canvas theme updated to: ${theme}`);
+    }
+  }, [theme, excalidrawAPI]);
+
+  // Auto-save function with debouncing
+  const autoSave = useCallback(async () => {
+    if (!excalidrawAPI || !room?.id) return;
+
+    const elements = excalidrawAPI.getSceneElements();
+    const appState = excalidrawAPI.getAppState();
+    const { collaborators, ...safeAppState } = appState || {};
+
+    setAutoSaving(true);
+    try {
+      await canvasAPI.save(room.id, elements, safeAppState);
+      setLastSaved(new Date());
+      console.log('✅ Auto-saved canvas');
+    } catch (error) {
+      console.error("Error auto-saving canvas:", error);
+    } finally {
+      setAutoSaving(false);
+    }
+  }, [excalidrawAPI, room]);
+
+  // Cleanup auto-save timer on unmount
+  useEffect(() => {
+    return () => {
+      if (autoSaveTimerRef.current) {
+        clearTimeout(autoSaveTimerRef.current);
+      }
+    };
+  }, []);
+
   // Handle canvas changes
   const handleChange = useCallback(
     (elements: readonly any[], appState: any) => {
@@ -177,11 +252,25 @@ export function ExcalidrawCanvas({ roomSlug }: ExcalidrawCanvasProps) {
       const { collaborators, ...safeAppState } = appState || {};
 
       if (isConnected && room?.id) {
-        console.log('📤 Sending canvas update');
-        sendCanvasUpdate(elements as any[], safeAppState);
+        console.log('📤 Sending canvas update (elements only)');
+        // Only send elements, not appState
+        // This keeps tool selection, theme, selections independent per user
+        
+        // Send updates immediately (component re-render issue fixed via memoization)
+        // We need to send every update to ensure smooth drawing and final state
+        sendCanvasUpdate(elements as any[], {});
+        
+        // Trigger auto-save with debouncing
+        if (autoSaveTimerRef.current) {
+          clearTimeout(autoSaveTimerRef.current);
+        }
+        
+        autoSaveTimerRef.current = setTimeout(() => {
+          autoSave();
+        }, 2000); // Auto-save 2 seconds after last change
       }
     },
-    [isConnected, room, sendCanvasUpdate]
+    [isConnected, room, sendCanvasUpdate, autoSave]
   );
 
   // Manual save
@@ -209,6 +298,46 @@ export function ExcalidrawCanvas({ roomSlug }: ExcalidrawCanvasProps) {
     setShowShareModal(true);
   }, []);
 
+  const renderTopRightUI = useCallback(() => (
+    <div className="flex items-center gap-2 mr-4">
+      <div className="flex items-center gap-2 px-3 py-1.5 bg-card rounded-lg shadow-sm text-xs border border-border">
+        <div
+          className={`w-2 h-2 rounded-full ${
+            isConnected ? "bg-green-500" : "bg-red-500"
+          }`}
+        />
+        <span className="text-card-foreground">
+          {isConnected ? "Live" : "Offline"}
+        </span>
+      </div>
+
+      <div className="flex items-center gap-2 px-3 py-1.5 bg-card rounded-lg shadow-sm text-xs border border-border">
+        <Users className="w-3 h-3 text-muted-foreground" />
+        <span className="text-card-foreground">
+          {activeUsers.length > 0 ? activeUsers.length : 1}
+        </span>
+      </div>
+
+      <button
+        onClick={handleShare}
+        className="flex items-center gap-2 px-4 py-1.5 bg-card border border-border rounded-lg hover:bg-accent text-card-foreground text-sm font-medium shadow-sm transition-colors"
+        title="Share room"
+      >
+        <Share2 className="w-4 h-4" />
+        <span>Share</span>
+      </button>
+
+      <button
+        onClick={handleSave}
+        disabled={saving}
+        className="flex items-center gap-2 px-4 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium shadow-sm transition-colors disabled:opacity-50"
+      >
+        <Save className="w-4 h-4" />
+        <span>{saving ? "Saving..." : "Save"}</span>
+      </button>
+    </div>
+  ), [isConnected, activeUsers.length, handleShare, handleSave, saving]);
+
   if (loading) {
     return (
       <div className="h-full flex items-center justify-center">
@@ -233,46 +362,9 @@ export function ExcalidrawCanvas({ roomSlug }: ExcalidrawCanvasProps) {
         initialData={initialData}
         onChange={handleChange}
         viewModeEnabled={false}
+        theme={theme}
         name={user?.name || "Guest"}
-        renderTopRightUI={() => (
-          <div className="flex items-center gap-2 mr-4">
-            <div className="flex items-center gap-2 px-3 py-1.5 bg-white rounded-lg shadow-sm text-xs border">
-              <div
-                className={`w-2 h-2 rounded-full ${
-                  isConnected ? "bg-green-500" : "bg-red-500"
-                }`}
-              />
-              <span className="text-gray-700">
-                {isConnected ? "Live" : "Offline"}
-              </span>
-            </div>
-
-            <div className="flex items-center gap-2 px-3 py-1.5 bg-white rounded-lg shadow-sm text-xs border">
-              <Users className="w-3 h-3 text-gray-600" />
-              <span className="text-gray-700">
-                {activeUsers.length > 0 ? activeUsers.length : 1}
-              </span>
-            </div>
-
-            <button
-              onClick={handleShare}
-              className="flex items-center gap-2 px-4 py-1.5 bg-white border rounded-lg hover:bg-gray-50 text-sm font-medium shadow-sm transition-colors"
-              title="Share room"
-            >
-              <Share2 className="w-4 h-4" />
-              <span>Share</span>
-            </button>
-
-            <button
-              onClick={handleSave}
-              disabled={saving}
-              className="flex items-center gap-2 px-4 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium shadow-sm transition-colors disabled:opacity-50"
-            >
-              <Save className="w-4 h-4" />
-              <span>{saving ? "Saving..." : "Save"}</span>
-            </button>
-          </div>
-        )}
+        renderTopRightUI={renderTopRightUI}
       />
 
       <ShareModal

@@ -1,7 +1,10 @@
+"use client";
+
 import { Button } from "@repo/ui/button";
 import { Card } from "@repo/ui/card";
 import { Pencil, Cloud, Users, Github, ArrowRight, Zap } from "lucide-react";
 import Link from "next/link";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 export default function LandingPage() {
   return (
@@ -11,16 +14,9 @@ export default function LandingPage() {
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Pencil className="h-6 w-6 text-primary" />
-            <span className="text-2xl font-bold font-sketch">Sketch Sync</span>
+            <span className="text-2xl font-bold font-sketch text-foreground">Sketch Sync</span>
           </div>
-          <div className="flex items-center gap-4">
-            <Link href="/signin">
-              <Button variant="ghost" className="font-sketch text-lg">Sign In</Button>
-            </Link>
-            <Link href="/signup">
-              <Button className="font-sketch text-lg">Start Sketching</Button>
-            </Link>
-          </div>
+          <ThemeToggle />
         </div>
       </nav>
 
@@ -35,7 +31,7 @@ export default function LandingPage() {
             <span className="text-sm font-medium font-mono">v2.0 Now Live</span>
           </div>
           
-          <h1 className="text-6xl md:text-8xl font-bold font-sketch mb-6 tracking-tight">
+          <h1 className="text-6xl md:text-8xl font-bold font-sketch mb-6 tracking-tight text-foreground">
             Sketch <span className="text-primary">Sync</span>
           </h1>
           <p className="text-xl md:text-2xl text-muted-foreground max-w-2xl mx-auto mb-10 font-sketch">
@@ -50,13 +46,7 @@ export default function LandingPage() {
               <Button size="lg" className="h-14 px-8 text-xl font-sketch rounded-2xl border-2 border-primary hover:scale-105 transition-transform">
                 Start Drawing Now <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
-            </Link>
-            <Link href="https://github.com/vikkkas/excalidraw-clone" target="_blank">
-               <Button variant="outline" size="lg" className="h-14 px-8 text-xl font-sketch rounded-2xl border-2 hover:bg-muted">
-                <Github className="mr-2 h-5 w-5" /> Star on GitHub
-              </Button>
-            </Link>
-          </div>
+            </Link>          </div>
         </div>
         
         {/* Background decoration */}
@@ -67,7 +57,7 @@ export default function LandingPage() {
       <section className="py-24 bg-muted/30">
         <div className="container mx-auto px-4">
           <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold font-sketch mb-4">Why Sketch Sync?</h2>
+            <h2 className="text-4xl font-bold font-sketch mb-4 text-foreground">Why Sketch Sync?</h2>
             <p className="text-muted-foreground font-mono">Built for speed, reliability, and collaboration.</p>
           </div>
 
@@ -116,7 +106,7 @@ function FeatureCard({ icon, title, description, code }: { icon: React.ReactNode
       <div className="mb-4 p-3 bg-primary/10 w-fit rounded-xl group-hover:scale-110 transition-transform">
         {icon}
       </div>
-      <h3 className="text-2xl font-bold font-sketch mb-2">{title}</h3>
+      <h3 className="text-2xl font-bold font-sketch mb-2 text-foreground">{title}</h3>
       <p className="text-muted-foreground mb-4">{description}</p>
       <div className="bg-muted p-3 rounded-lg font-mono text-xs text-muted-foreground overflow-hidden">
         <code>{code}</code>

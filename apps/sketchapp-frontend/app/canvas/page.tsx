@@ -8,6 +8,7 @@ import { Card } from "@repo/ui/card";
 import { Pencil, LogOut, Plus, Trash2, Edit2 } from "lucide-react";
 import { Modal } from "@/components/Modal";
 import { toast } from "sonner";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 export default function CanvasPage() {
   const router = useRouter();
@@ -124,12 +125,13 @@ export default function CanvasPage() {
         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Pencil className="h-6 w-6 text-primary" />
-            <h1 className="text-2xl font-bold font-sketch">Sketch Sync</h1>
+            <h1 className="text-2xl font-bold font-sketch text-foreground">Sketch Sync</h1>
           </div>
           <div className="flex items-center gap-4">
             <span className="text-sm text-muted-foreground font-mono hidden sm:inline-block">
               Welcome, <span className="text-foreground font-bold">{user?.name}</span>
             </span>
+            <ThemeToggle />
             <Button variant="ghost" size="sm" onClick={handleLogout} className="text-muted-foreground hover:text-destructive">
               <LogOut className="h-4 w-4 mr-2" />
               Logout
@@ -142,7 +144,7 @@ export default function CanvasPage() {
       <main className="max-w-7xl mx-auto px-4 py-8">
         {/* Create Room Section */}
         <Card className="p-6 mb-8 border-2 border-border/50 bg-card/50 backdrop-blur-sm">
-          <h2 className="text-xl font-bold font-sketch mb-4 flex items-center gap-2">
+          <h2 className="text-xl font-bold font-sketch mb-4 flex items-center gap-2 text-foreground">
             <Plus className="h-5 w-5 text-primary" /> Create New Room
           </h2>
           <div className="flex gap-4">
@@ -166,7 +168,7 @@ export default function CanvasPage() {
 
         {/* Rooms List */}
         <div>
-          <h2 className="text-xl font-bold font-sketch mb-4">Your Rooms</h2>
+          <h2 className="text-xl font-bold font-sketch mb-4 text-foreground">Your Rooms</h2>
           {rooms.length === 0 ? (
             <Card className="p-12 text-center text-muted-foreground border-2 border-dashed border-border/50">
               <p className="font-sketch text-xl">No rooms yet. Create one to get started!</p>

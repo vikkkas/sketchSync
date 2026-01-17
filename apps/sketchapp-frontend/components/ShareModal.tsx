@@ -18,14 +18,31 @@ export function ShareModal({ isOpen, onClose, roomSlug, roomId }: ShareModalProp
   const [members, setMembers] = useState<any[]>([]);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState("");
+  const [isPublic, setIsPublic] = useState(false);
+  const [updatingAccess, setUpdatingAccess] = useState(false);
 
   const shareUrl = `${typeof window !== "undefined" ? window.location.origin : ""}/draw?room=${roomSlug}`;
 
   useEffect(() => {
     if (isOpen) {
-      loadMembers();
+      loadRoomData();
     }
   }, [isOpen, roomId]);
+
+  const loadRoomData = async () => {
+    try {
+      // Load members
+      const membersResponse = await roomAPI.getMembers(roomId);
+      setMembers(membersResponse.members || []);
+      
+      // Load room details to get isPublic status
+      const roomResponse = await roomAPI.getBySlug(roomSlug);
+      setIsPublic(roomResponse.room?.isPublic || false);
+    } catch (err) {
+      console.error("Error loading room data:", err);
+      toast.error("Failed to load room data");
+    }
+  };
 
   const loadMembers = async () => {
     try {
@@ -44,6 +61,20 @@ export function ShareModal({ isOpen, onClose, roomSlug, roomId }: ShareModalProp
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const handleTogglePublic = async () => {
+    setUpdatingAccess(true);
+    try {
+      await roomAPI.update(roomId, { isPublic: !isPublic });
+      setIsPublic(!isPublic);
+      toast.success(`Room is now ${!isPublic ? 'public' : 'private'}`);
+    } catch (err) {
+      console.error("Error updating room access:", err);
+      toast.error("Failed to update room access");
+    } finally {
+      setUpdatingAccess(false);
+    }
+  };
+
   const handleInvite = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.trim()) return;
@@ -55,7 +86,7 @@ export function ShareModal({ isOpen, onClose, roomSlug, roomId }: ShareModalProp
       await roomAPI.addMember(roomId, email, "editor");
       setEmail("");
       toast.success("User invited successfully");
-      await loadMembers();
+      await loadRoomData();
     } catch (err: any) {
       const errorMessage = err.response?.data?.message || "Failed to invite user";
       setError(errorMessage);
@@ -74,7 +105,7 @@ export function ShareModal({ isOpen, onClose, roomSlug, roomId }: ShareModalProp
     try {
       await roomAPI.removeMember(roomId, userId);
       toast.success("Member removed");
-      await loadMembers();
+      await loadRoomData();
     } catch (err: any) {
       console.error("Error removing member:", err);
       const errorMessage = err.response?.data?.message || "Failed to remove member";
@@ -85,32 +116,63 @@ export function ShareModal({ isOpen, onClose, roomSlug, roomId }: ShareModalProp
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-2xl max-w-md w-full max-h-[90vh] overflow-hidden flex flex-col">
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-card rounded-xl shadow-2xl max-w-md w-full max-h-[90vh] overflow-hidden flex flex-col border border-border">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b">
+        <div className="flex items-center justify-between p-6 border-b border-border">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-              <Users className="w-5 h-5 text-blue-600" />
+            <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
+              <Users className="w-5 h-5 text-primary" />
             </div>
             <div>
-              <h2 className="text-xl font-semibold">Share Room</h2>
-              <p className="text-sm text-gray-500">Invite others to collaborate</p>
+              <h2 className="text-xl font-semibold text-foreground">Share Room</h2>
+              <p className="text-sm text-muted-foreground">Invite others to collaborate</p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
+            className="text-muted-foreground hover:text-foreground transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+        <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-card">
+          {/* Public/Private Access Toggle */}
+          <div className="p-4 bg-muted/30 rounded-lg border border-border">
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm font-semibold text-foreground">
+                    {isPublic ? "🌍 Public Access" : "🔒 Private Access"}
+                  </h3>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {isPublic 
+                    ? "Anyone with the link can access this room" 
+                    : "Only invited members can access this room"}
+                </p>
+              </div>
+              <button
+                onClick={handleTogglePublic}
+                disabled={updatingAccess}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-card disabled:opacity-50 ${
+                  isPublic ? 'bg-green-600' : 'bg-muted-foreground/30'
+                }`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    isPublic ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+            </div>
+          </div>
+
           {/* Share Link */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-foreground mb-2">
               Share Link
             </label>
             <div className="flex gap-2">
@@ -118,11 +180,11 @@ export function ShareModal({ isOpen, onClose, roomSlug, roomId }: ShareModalProp
                 type="text"
                 value={shareUrl}
                 readOnly
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-sm"
+                className="flex-1 px-3 py-2 border border-input rounded-lg bg-secondary text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
               />
               <button
                 onClick={handleCopyLink}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+                className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors flex items-center gap-2"
               >
                 {copied ? (
                   <>
@@ -137,14 +199,16 @@ export function ShareModal({ isOpen, onClose, roomSlug, roomId }: ShareModalProp
                 )}
               </button>
             </div>
-            <p className="mt-2 text-xs text-gray-500">
-              Anyone with this link can view and edit this canvas
+            <p className="mt-2 text-xs text-muted-foreground">
+              {isPublic 
+                ? "Anyone with this link can view and edit this canvas" 
+                : "Only members added below can access this room"}
             </p>
           </div>
 
           {/* Invite by Email */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-foreground mb-2">
               Invite by Email
             </label>
             <form onSubmit={handleInvite} className="flex gap-2">
@@ -154,29 +218,29 @@ export function ShareModal({ isOpen, onClose, roomSlug, roomId }: ShareModalProp
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="colleague@example.com"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm"
+                  className="w-full px-3 py-2 border border-input rounded-lg bg-background text-foreground focus:ring-2 focus:ring-primary focus:border-transparent outline-none text-sm placeholder:text-muted-foreground"
                 />
               </div>
               <button
                 type="submit"
                 disabled={loading || !email.trim()}
-                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >
                 <Mail className="w-4 h-4" />
                 <span className="text-sm">{loading ? "Inviting..." : "Invite"}</span>
               </button>
             </form>
             {error && (
-              <div className="mt-2 p-3 bg-red-50 border border-red-200 rounded-lg">
-                <p className="text-xs text-red-700 font-medium">{error}</p>
+              <div className="mt-2 p-3 bg-destructive/10 border border-destructive/20 rounded-lg">
+                <p className="text-xs text-destructive font-medium">{error}</p>
                 {error.includes("not found") && (
-                  <p className="mt-1 text-xs text-red-600">
+                  <p className="mt-1 text-xs text-destructive/80">
                     💡 Tip: The user must create an account first. Share the link above instead!
                   </p>
                 )}
               </div>
             )}
-            <p className="mt-2 text-xs text-gray-600">
+            <p className="mt-2 text-xs text-muted-foreground">
               ⚠️ <strong>Note:</strong> User must have an account. Or just share the link above for instant access!
             </p>
           </div>
@@ -184,14 +248,14 @@ export function ShareModal({ isOpen, onClose, roomSlug, roomId }: ShareModalProp
           {/* Members List */}
           {members.length > 0 && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-3">
+              <label className="block text-sm font-medium text-foreground mb-3">
                 Members ({members.length})
               </label>
               <div className="space-y-2">
                 {members.map((member) => (
                   <div
                     key={member.id}
-                    className="flex items-center justify-between p-3 bg-muted rounded-lg border border-border/50 group"
+                    className="flex items-center justify-between p-3 bg-secondary/50 rounded-lg border border-border group"
                   >
                     <div className="flex items-center gap-3">
                       <div className="w-8 h-8 bg-primary/20 rounded-full flex items-center justify-center text-primary text-sm font-bold font-sketch">
@@ -228,10 +292,10 @@ export function ShareModal({ isOpen, onClose, roomSlug, roomId }: ShareModalProp
         </div>
 
         {/* Footer */}
-        <div className="p-6 border-t bg-gray-50">
+        <div className="p-6 border-t border-border bg-muted/20">
           <button
             onClick={onClose}
-            className="w-full px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors font-medium"
+            className="w-full px-4 py-2 bg-secondary text-secondary-foreground rounded-lg hover:bg-secondary/80 transition-colors font-medium"
           >
             Done
           </button>

@@ -5,8 +5,11 @@ import { useRouter, useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
 import { Button } from "@repo/ui/button";
 import { Card } from "@repo/ui/card";
-import { Pencil, ArrowLeft, User } from "lucide-react";
+import { Pencil, ArrowLeft, User, Lock } from "lucide-react";
 import Link from "next/link";
+import { roomAPI } from "@/lib/api";
+import { toast } from "sonner";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 // Dynamically import Excalidraw to avoid SSR issues
 const ExcalidrawCanvas = dynamic(
@@ -28,23 +31,58 @@ function DrawPageContent() {
   const [user, setUser] = useState<any>(null);
   const [showNamePrompt, setShowNamePrompt] = useState(false);
   const [guestName, setGuestName] = useState("");
+  const [roomData, setRoomData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [accessDenied, setAccessDenied] = useState(false);
 
   useEffect(() => {
-    // Check if user is logged in
-    const userStr = localStorage.getItem("user");
-    const guestNameStored = localStorage.getItem("guestName");
-    
-    if (userStr) {
-      // Logged in user
-      setUser(JSON.parse(userStr));
-    } else if (guestNameStored) {
-      // Guest with name already set
-      setUser({ name: guestNameStored, isGuest: true });
-    } else {
-      // New guest - show name prompt
-      setShowNamePrompt(true);
+    if (!roomSlug) {
+      setLoading(false);
+      return;
     }
-  }, [router]);
+
+    const checkRoomAccess = async () => {
+      try {
+        // Check if user is logged in
+        const userStr = localStorage.getItem("user");
+        const guestNameStored = localStorage.getItem("guestName");
+        
+        // Fetch room data to check if it's public
+        const response = await roomAPI.getBySlug(roomSlug);
+        setRoomData(response.room);
+
+        const isPublic = response.room?.isPublic;
+
+        if (userStr) {
+          // Logged in user - always allow
+          setUser(JSON.parse(userStr));
+          setLoading(false);
+        } else if (isPublic) {
+          // Public room - allow guest access
+          if (guestNameStored) {
+            setUser({ name: guestNameStored, isGuest: true });
+          } else {
+            setShowNamePrompt(true);
+          }
+          setLoading(false);
+        } else {
+          // Private room - require authentication
+          setAccessDenied(true);
+          setLoading(false);
+        }
+      } catch (error: any) {
+        console.error("Error checking room access:", error);
+        if (error.response?.status === 403) {
+          setAccessDenied(true);
+        } else {
+          toast.error("Failed to load room");
+        }
+        setLoading(false);
+      }
+    };
+
+    checkRoomAccess();
+  }, [roomSlug, router]);
 
   const handleGuestJoin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -55,6 +93,65 @@ function DrawPageContent() {
     setUser({ name: guestName, isGuest: true });
     setShowNamePrompt(false);
   };
+
+  // Loading state
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center">
+          <div className="text-lg font-sketch animate-pulse">Checking room access...</div>
+        </div>
+      </div>
+    );
+  }
+
+  // Access denied for private rooms
+  if (accessDenied) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background p-4 relative overflow-hidden">
+        {/* Background decoration */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-red-500/5 rounded-full blur-3xl -z-10" />
+
+        <Card className="w-full max-w-md p-8 space-y-6 border-2 border-red-200 backdrop-blur-sm bg-card/80">
+          <div className="text-center">
+            <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Lock className="w-8 h-8 text-red-600" />
+            </div>
+            <h1 className="text-2xl font-bold font-sketch text-foreground mb-2">Private Room</h1>
+            <p className="text-muted-foreground font-mono text-sm">
+              This room is private and requires authentication
+            </p>
+          </div>
+
+          <div className="space-y-3">
+            <Button
+              onClick={() => router.push(`/signin?redirect=/draw?room=${roomSlug}`)}
+              className="w-full h-12 text-lg font-sketch"
+            >
+              Sign In to Access
+            </Button>
+            
+            <Button
+              variant="outline"
+              onClick={() => router.push("/signup")}
+              className="w-full h-12 text-lg font-sketch"
+            >
+              Create Account
+            </Button>
+          </div>
+
+          <div className="mt-6 pt-6 border-t border-border/50 text-center">
+            <p className="text-sm text-muted-foreground mb-3 font-mono">
+              Don't have access?
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Ask the room owner to make it public or invite you as a member
+            </p>
+          </div>
+        </Card>
+      </div>
+    );
+  }
 
   if (!roomSlug) {
     return (
@@ -147,7 +244,7 @@ function DrawPageContent() {
             {user?.isGuest ? "Home" : "Dashboard"}
           </Button>
           <div className="h-6 w-px bg-border" />
-          <h1 className="text-base font-bold font-sketch flex items-center gap-2">
+          <h1 className="text-base font-bold font-sketch flex items-center gap-2 text-foreground">
             <span className="text-muted-foreground font-mono font-normal text-xs uppercase tracking-wider">Room:</span>
             {roomSlug}
           </h1>
@@ -162,6 +259,7 @@ function DrawPageContent() {
             <User className="h-4 w-4 text-muted-foreground" />
             {user?.name}
           </div>
+          <ThemeToggle />
         </div>
       </header>
 
