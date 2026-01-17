@@ -10,9 +10,10 @@ import { prismaClient } from "@repo/db/client";
 import { authMiddleware, optionalAuthMiddleware } from "./middleware";
 import cors from "cors";
 import { AuthService } from "./services/auth.service";
+import { EmailService } from "./services/email.service";
 import { FRONTEND_URL, PORT } from "./config";
 const app = express();
-app.use(express.json());
+app.use(express.json({ limit: "10mb" }));
 
 // CORS Configuration
 app.use(
@@ -619,6 +620,26 @@ app.get("/api/chats/:roomId", authMiddleware, async (req: Request, res: Response
     res.json({ messages });
   } catch (e) {
     console.error("Get chats error:", e);
+    return res.status(500).json({
+      message: e instanceof Error ? e.message : "Internal server error",
+    });
+  }
+});
+
+// ============ EMAIL ROUTES ============
+
+app.post("/api/email/send-export", optionalAuthMiddleware, async (req: Request, res: Response) => {
+  const { to, files } = req.body;
+
+  if (!to || !files || !Array.isArray(files) || files.length === 0) {
+    return res.status(400).json({ message: "Missing 'to' email or 'files' array" });
+  }
+
+  try {
+    await EmailService.sendExportEmail(to, files);
+    res.json({ message: "Email sent successfully" });
+  } catch (e) {
+    console.error("Send email error:", e);
     return res.status(500).json({
       message: e instanceof Error ? e.message : "Internal server error",
     });

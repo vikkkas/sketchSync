@@ -161,4 +161,12 @@ export const chatAPI = {
   },
 };
 
+export const emailAPI = {
+  sendExport: async (to: string, files: { filename: string; content: string; contentType: string }[]) => {
+    const response = await apiClient.post('/api/email/send-export', { to, files });
+    return response.data;
+  },
+};
+
+
 export default apiClient;

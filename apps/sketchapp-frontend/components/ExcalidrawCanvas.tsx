@@ -1,11 +1,12 @@
 "use client";
 
-import { Excalidraw } from "@excalidraw/excalidraw";
+import { Excalidraw, exportToBlob } from "@excalidraw/excalidraw";
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useWebSocket } from "@/hooks/useWebSocket";
-import { roomAPI, canvasAPI } from "@/lib/api";
-import { Share2, Users, Save } from "lucide-react";
+import { roomAPI, canvasAPI, emailAPI } from "@/lib/api";
+import { Share2, Users, Save, Mail } from "lucide-react";
 import { ShareModal } from "./ShareModal";
+import { EmailExportModal } from "./EmailExportModal";
 import { toast } from "sonner";
 import { useTheme } from "@/contexts/ThemeContext";
 
@@ -24,6 +25,7 @@ export function ExcalidrawCanvas({ roomSlug }: ExcalidrawCanvasProps) {
   const [autoSaving, setAutoSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [showShareModal, setShowShareModal] = useState(false);
+  const [showEmailModal, setShowEmailModal] = useState(false);
   const isRemoteUpdate = useRef<boolean>(false);
   const pendingUpdates = useRef<Array<{ elements: any[], appState: any }>>([]);
   const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -298,6 +300,125 @@ export function ExcalidrawCanvas({ roomSlug }: ExcalidrawCanvasProps) {
     setShowShareModal(true);
   }, []);
 
+  const handleExportToEmail = useCallback(async (email: string, options: any) => {
+    if (!excalidrawAPI) return;
+
+    const elements = excalidrawAPI.getSceneElements();
+    const files = excalidrawAPI.getFiles();
+    
+    // Check if there's anything to export
+    if (!elements || elements.length === 0) {
+       toast.error("Canvas is empty");
+       return;
+    }
+
+    const { withBackground, darkMode, scale, includeRaw } = options;
+    const attachments = [];
+
+    // 1. Generate Image (PNG)
+    try {
+        const blob = await exportToBlob({
+          elements,
+          files,
+          appState: {
+             ...excalidrawAPI.getAppState(),
+             exportWithDarkMode: darkMode,
+             exportBackground: withBackground,
+             exportScale: scale,
+          },
+          mimeType: "image/png",
+        });
+
+        if (blob) {
+            const base64data = await new Promise<string>((resolve, reject) => {
+                const reader = new FileReader();
+                reader.readAsDataURL(blob);
+                reader.onloadend = () => resolve(reader.result as string);
+                reader.onerror = reject;
+            });
+            attachments.push({
+                filename: `drawing-export.png`,
+                content: base64data,
+                contentType: 'image/png'
+            });
+        }
+    } catch (e) {
+        console.error("Failed to generate PNG", e);
+        toast.error("Failed to generate image");
+        return;
+    }
+
+    // 2. Generate Raw File (JSON) if requested
+    if (includeRaw) {
+        try {
+            const rawData = JSON.stringify({
+                type: "excalidraw",
+                version: 2,
+                source: "https://excalidraw.com",
+                elements,
+                appState: {
+                  ...excalidrawAPI.getAppState(),
+                  viewBackgroundColor: withBackground ? excalidrawAPI.getAppState().viewBackgroundColor : "#ffffff",
+                },
+                files,
+            }, null, 2);
+            
+            // Encode as base64 for transport (backend expects base64 or string content)
+            const rawBase64 = `data:application/json;base64,${btoa(unescape(encodeURIComponent(rawData)))}`;
+            
+            attachments.push({
+                filename: `drawing-raw.excalidraw`,
+                content: rawBase64,
+                contentType: 'application/json'
+            });
+        } catch (e) {
+            console.error("Failed to generate raw file", e);
+        }
+    }
+
+    // Send
+    try {
+        await emailAPI.sendExport(email, attachments);
+        toast.success("Export sent to your email!");
+    } catch (error) {
+        console.error("Export error:", error);
+        toast.error("Failed to send export email");
+    }
+  }, [excalidrawAPI]);
+
+  // Function to generate preview
+  const getPreview = useCallback(async (options: any) => {
+    if (!excalidrawAPI) return null;
+
+    const elements = excalidrawAPI.getSceneElements();
+    const files = excalidrawAPI.getFiles();
+    
+    if (!elements || elements.length === 0) return null;
+
+    const { withBackground, darkMode, scale } = options;
+
+    try {
+      const blob = await exportToBlob({
+        elements,
+        files,
+        appState: {
+           ...excalidrawAPI.getAppState(),
+           exportWithDarkMode: darkMode,
+           exportBackground: withBackground,
+           exportScale: scale,
+        },
+        mimeType: "image/png",
+      });
+
+      if (!blob) return null;
+      
+      return URL.createObjectURL(blob);
+    } catch (e) {
+      console.error("Preview generation failed", e);
+      return null;
+    }
+  }, [excalidrawAPI]);
+
   const renderTopRightUI = useCallback(() => (
     <div className="flex items-center gap-2 mr-4">
       <div className="flex items-center gap-2 px-3 py-1.5 bg-card rounded-lg shadow-sm text-xs border border-border">
@@ -328,6 +449,15 @@ export function ExcalidrawCanvas({ roomSlug }: ExcalidrawCanvasProps) {
       </button>
 
       <button
+        onClick={() => setShowEmailModal(true)}
+        className="flex items-center gap-2 px-4 py-1.5 bg-card border border-border rounded-lg hover:bg-accent text-card-foreground text-sm font-medium shadow-sm transition-colors"
+        title="Export to Email"
+      >
+        <Mail className="w-4 h-4" />
+        <span>Export</span>
+      </button>
+
+      <button
         onClick={handleSave}
         disabled={saving}
         className="flex items-center gap-2 px-4 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium shadow-sm transition-colors disabled:opacity-50"
@@ -345,6 +475,8 @@ export function ExcalidrawCanvas({ roomSlug }: ExcalidrawCanvasProps) {
       </div>
     );
   }
+
+
 
   return (
     <div className="h-full w-full relative">
@@ -372,6 +504,14 @@ export function ExcalidrawCanvas({ roomSlug }: ExcalidrawCanvasProps) {
         onClose={() => setShowShareModal(false)}
         roomSlug={roomSlug}
         roomId={room?.id || 0}
+      />
+      
+      <EmailExportModal
+        isOpen={showEmailModal}
+        onClose={() => setShowEmailModal(false)}
+        onSend={handleExportToEmail}
+        getPreview={getPreview}
+        theme={theme}
       />
     </div>
   );
