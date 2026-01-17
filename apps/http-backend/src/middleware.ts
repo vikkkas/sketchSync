@@ -1,3 +1,4 @@
+/// <reference path="./types/express.d.ts" />
 import jwt, { JwtPayload } from 'jsonwebtoken';
 import { NextFunction, Request, Response } from "express";
 import { JWT_SECRET } from "@repo/backend-common/config";

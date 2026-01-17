@@ -1,3 +1,4 @@
+/// <reference path="./types/express.d.ts" />
 import express, { Request, Response } from "express";
 import { JWT_SECRET } from "@repo/backend-common/config";
 import {
@@ -238,13 +239,29 @@ app.post("/api/room", authMiddleware, async (req: Request, res: Response) => {
 
   const userId = req.userId!;
   try {
+    // Generate unique slug: name-based + random string
+    const baseSlug = parsedData.data.name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+    const randomSuffix = Math.random().toString(36).substring(2, 8); // 6 random chars
+    const slug = `${baseSlug}-${randomSuffix}`;
+
+    // Double-check uniqueness (very unlikely to collide, but safe)
+    const existing = await prismaClient.room.findUnique({ where: { slug } });
+    if (existing) {
+      // Extremely rare - add timestamp
+      const timestampSlug = `${baseSlug}-${Date.now().toString(36)}`;
+      return res.status(500).json({ 
+        message: "Slug collision detected, please try again",
+        suggestedSlug: timestampSlug 
+      });
+    }
+
     // Create room with canvas
     const room = await prismaClient.room.create({
       data: {
-        slug: parsedData.data.name.toLowerCase().replace(/ /g, "-"),
+        slug,
         name: parsedData.data.name,
         adminId: userId,
-        isPublic: false,
+        isPublic: false, // Default to private
         canvas: {
           create: {
             createdBy: userId,
@@ -269,6 +286,7 @@ app.post("/api/room", authMiddleware, async (req: Request, res: Response) => {
         id: room.id,
         slug: room.slug,
         name: room.name,
+        isPublic: room.isPublic,
         canvasId: room.canvas?.id,
       },
     });
@@ -334,13 +352,15 @@ app.get("/api/room/:slug", optionalAuthMiddleware, async (req: Request, res: Res
       hasAuthHeader: !!req.headers.authorization
     });
 
-    // Allow access to anyone who has the slug (link)
-    // This treats the slug as a capability token
-    const hasAccess = true;
+    // Allow access if:
+    // 1. Room is public (anyone with link can access)
+    // 2. User is authenticated AND is a member/admin
+    const isPublic = room.isPublic;
+    const hasAccess = isPublic || isMember || isAdmin;
 
     if (!hasAccess) {
-      console.log("Access denied for room:", slug);
-      return res.status(403).json({ message: "Access denied" });
+      console.log("Access denied for room:", slug, { isPublic, isMember, isAdmin });
+      return res.status(403).json({ message: "Access denied. This room is private." });
     }
 
     res.json({ room });
